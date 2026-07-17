@@ -32,3 +32,9 @@ model vehiculos {
   mime_type String? @db.VarChar(255)
   modelo    String  @db.VarChar(255)
 }
+
+model revoked_token {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique
+  expires_at DateTime @db.Timestamp(6)
+}

@@ -120,7 +120,53 @@ export const perfil = async (req: CustomRequest, res: Response) => {
 
 //LOGOUT
 export const logout = async (req: Request, res: Response) => {
-  res.status(200).json({
-    Mensaje: "Sesión cerrada exitosamente",
-  });
+  // Tomamos el header Authorization
+  const authHeader = req.headers.authorization;
+
+  // Sacamos solo el token, quitando la palabra Bearer
+  const token = authHeader && authHeader.split(" ")[1];
+
+  // Si no llegó token, no se puede cerrar sesión
+  if (!token) {
+    res.status(401).json({ error: "NO EXISTE TOKEN PARA CERRAR" });
+    return;
+  }
+
+  try {
+    // Decodificamos el token para obtener su fecha de expiración
+    const decoded = jwt.decode(token) as jwt.JwtPayload | null;
+
+    // Si el token no se puede leer, respondemos error
+    if (!decoded || !decoded.exp) {
+      res.status(400).json({ error: "TOKEN NO VÁLIDO" });
+      return;
+    }
+
+    // Convertimos la expiración del token a fecha normal
+    const expiresAt = new Date(decoded.exp * 1000);
+
+    // Guardamos el token en la tabla blacklist de tokens 
+    await prisma.revoked_token.create({
+      data: {
+        token: token,
+        expires_at: expiresAt,
+      },
+    });
+
+    res.status(200).json({
+      mensaje: "Sesión cerrada exitosamente",
+    });
+
+  } catch (error: any) {
+    // Si el token ya estaba guardado, igual respondemos como cerrado
+    if (error.code === "P2002") {
+      res.status(200).json({
+        mensaje: "Sesión ya estaba cerrada",
+      });
+      return;
+    }
+
+    console.log("ERROR LOGOUT:", error);
+    res.status(500).json({ error: "ERROR AL CERRAR SESIÓN" });
+  }
 };
